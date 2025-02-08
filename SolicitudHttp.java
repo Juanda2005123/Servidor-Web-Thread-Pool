@@ -46,77 +46,83 @@ final class SolicitudHttp implements Runnable
         }
 
         private void proceseSolicitud() throws Exception {
-            // Referencia al stream de salida del socket.
-            DataOutputStream os = new DataOutputStream(socket.getOutputStream());
+            try (DataOutputStream os = new DataOutputStream(socket.getOutputStream());
+            BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
 
-            // Referencia y filtros (InputStreamReader y BufferedReader)para el stream de entrada.
-            BufferedReader br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                String lineaDeSolicitud = br.readLine();
+                System.out.println("\n"+lineaDeSolicitud +"\n");
 
-            String lineaDeSolicitud = br.readLine();
-            System.out.println("\n"+lineaDeSolicitud +"\n");
+                String lineaDelHeader = null;
+                while ((lineaDelHeader = br.readLine()).length() != 0) {
+                        System.out.println(lineaDelHeader);
+                }
+                
+                for(int i = 0; i < 3 ; i++){
+                    System.out.println("\n");
+                }
 
-            String lineaDelHeader = null;
-            while ((lineaDelHeader = br.readLine()).length() != 0) {
-                    System.out.println(lineaDelHeader);
-            }
+                // Extrae el nombre del archivo de la línea de solicitud.
+                StringTokenizer partesLinea = new StringTokenizer(lineaDeSolicitud);
+                partesLinea.nextToken();  // "salta" sobre el método, se supone que debe ser "GET"
+                String nombreArchivo = partesLinea.nextToken();
+
+                // Anexa un ".", de tal forma que el archivo solicitado debe estar en el directorio actual.
+                nombreArchivo = "." + nombreArchivo;
             
-            for(int i = 0; i < 3 ; i++){
-                System.out.println("\n");
+                // Abre el archivo seleccionado.
+                FileInputStream fis = null;
+                boolean existeArchivo = true;
+                try {
+                        fis = new FileInputStream(nombreArchivo);
+                } catch (FileNotFoundException e) {
+                        existeArchivo = false;
+                }
+
+                // Construye el mensaje de respuesta.
+                String lineaDeEstado = null;
+                String lineaDeTipoContenido = null;
+                String cuerpoMensaje = null;
+
+                if (existeArchivo) {
+                        lineaDeEstado = "HTTP/1.0 200 OK" + CRLF;
+                        lineaDeTipoContenido = "Content-type: " + 
+                                contentType( nombreArchivo ) + CRLF;
+                } else {
+                        lineaDeEstado = "HTTP/1.0 404 Not Found" + CRLF;
+                        lineaDeTipoContenido = "Content-Type: text/html" + CRLF;
+                        cuerpoMensaje = "<HTML>" + 
+                                "<HEAD><TITLE>404 Not Found</TITLE></HEAD>" +
+                                "<BODY><b>404</b> Not Found</BODY></HTML>";
+                }
+
+                // Envia la línea de estado.
+                os.writeBytes(lineaDeEstado);
+
+                // Envía el contenido de la línea content-type.
+                os.writeBytes(lineaDeTipoContenido);
+
+                // Envía una línea en blanco para indicar el final de las líneas de header.
+                os.writeBytes(CRLF);
+
+                // Envía el cuerpo del mensaje.
+                if (existeArchivo) {
+                    enviarBytes(fis, os);
+                    fis.close();
+                } else {
+                    os.writeBytes(cuerpoMensaje);
+                }
+
+                os.close();
+                br.close();
+                socket.close();
+            } catch (Exception e) {
+                System.err.println("Error procesando solicitud: " + e.getMessage());
+            } finally {
+                try {
+                    socket.close(); // Aseguramos cierre del socket
+                } catch (IOException e) {
+                    System.err.println("Error cerrando socket: " + e.getMessage());
+                }
             }
-
-            // Extrae el nombre del archivo de la línea de solicitud.
-            StringTokenizer partesLinea = new StringTokenizer(lineaDeSolicitud);
-            partesLinea.nextToken();  // "salta" sobre el método, se supone que debe ser "GET"
-            String nombreArchivo = partesLinea.nextToken();
-
-            // Anexa un ".", de tal forma que el archivo solicitado debe estar en el directorio actual.
-            nombreArchivo = "." + nombreArchivo;
-        
-            // Abre el archivo seleccionado.
-            FileInputStream fis = null;
-            boolean existeArchivo = true;
-            try {
-                    fis = new FileInputStream(nombreArchivo);
-            } catch (FileNotFoundException e) {
-                    existeArchivo = false;
-            }
-
-            // Construye el mensaje de respuesta.
-            String lineaDeEstado = null;
-            String lineaDeTipoContenido = null;
-            String cuerpoMensaje = null;
-
-            if (existeArchivo) {
-                    lineaDeEstado = "HTTP/1.0 200 OK" + CRLF;
-                    lineaDeTipoContenido = "Content-type: " + 
-                            contentType( nombreArchivo ) + CRLF;
-            } else {
-                    lineaDeEstado = "HTTP/1.0 404 Not Found" + CRLF;
-                    lineaDeTipoContenido = "Content-Type: text/html" + CRLF;
-                    cuerpoMensaje = "<HTML>" + 
-                            "<HEAD><TITLE>404 Not Found</TITLE></HEAD>" +
-                            "<BODY><b>404</b> Not Found</BODY></HTML>";
-            }
-
-            // Envia la línea de estado.
-            os.writeBytes(lineaDeEstado);
-
-            // Envía el contenido de la línea content-type.
-            os.writeBytes(lineaDeTipoContenido);
-
-            // Envía una línea en blanco para indicar el final de las líneas de header.
-            os.writeBytes(CRLF);
-
-            // Envía el cuerpo del mensaje.
-            if (existeArchivo) {
-                enviarBytes(fis, os);
-                fis.close();
-            } else {
-                os.writeBytes(cuerpoMensaje);
-            }
-
-            os.close();
-            br.close();
-            socket.close();
         }
 }
