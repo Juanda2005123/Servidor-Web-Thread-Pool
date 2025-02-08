@@ -12,7 +12,7 @@ public final class ServidorWeb {
             ServerSocket socketdeEscucha = new ServerSocket(port);
             // Creating a thread pool
             int poolSize = Runtime.getRuntime().availableProcessors();
-            poolSize = 1;
+            //poolSize = 1;
             ExecutorService pool = new ThreadPoolExecutor(
                 poolSize,
                 100, 
